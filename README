@@ -1,0 +1,107 @@
+Up and Running with Sinatra and ActiveRecord
+
+> mkdir activerecord-sinatra && cd activerecord-sinatra
+> touch app.rb
+
+Install two gems for ActiveRecord and the JSON gem for a real API-looking output.
+
+> gem install activerecord sinatra-activerecord json
+
+I will be using Postgres on my local machine, so my create commands are as follows:
+
+> createdb -Omatt -Eutf8 activerecord_sinatra
+
+Now open the "app.rb" file and edit it as so.
+
+#app.rb
+require 'sinatra'
+require 'sinatra/activerecord'
+require 'json'
+
+set :database, 'postgres://matt@localhost/activerecord_sinatra'
+
+class Course < ActiveRecord::Base
+  belongs_to :teacher
+end
+
+class Teacher < ActiveRecord::Base
+  has_many :courses
+end
+
+get '/' do
+  "Hello World!"
+end
+
+get '/courses' do
+  Course.all.to_json
+end
+
+get '/course/:id' do
+  Course.find(:first, params[:id]).to_json
+end
+
+get '/teachers' do
+  Teacher.all.to_json
+end
+
+get '/teacher/:id' do
+  Teacher.find(:first, params[:id]).to_json
+end
+
+#show which courses the teacher teaches
+get '/teacher/:id/courses' do
+  Teacher.find(params[:id]).courses.to_json
+end
+
+ActiveRecord migrations are powerful, because they create a schema-independent way to control databases. Rake requires a rakefile to be present, so we will create that.
+
+> touch Rakefil
+
+#Rakefile
+require './app'
+require 'sinatra/activerecord/rake'
+
+Now you are able to create and manage migrations, much like you can with Ruby on Rails.
+
+> rake db:create_migration NAME=create_courses_and_teachers
+
+This will create a directory tree in your folder of the pattern "/db/migrate/{migration}". Open the file and modify it as follows.
+
+class CreateCoursesAndTeachers < ActiveRecord::Migration
+  def self.up
+    create_table :courses do |t|
+      t.string :title
+      t.integer :teacher_id
+    end
+    create_table :teachers do |t|
+      t.string :name
+    end
+  end
+
+  def self.down
+    drop_table :courses
+    drop_table :teachers
+  end
+end
+
+Run the migration.
+
+> rake db:migrate
+
+For ease of use, you can add the following to the "app.rb" file to autogenerate some data.
+
+#put below everything in app.rb, only run once!
+get '/make' do
+  teacher1 = Teacher.create(:name => "Mrs. Crabtree")
+  teacher2 = Teacher.create(:name => "Alberto Yeinstein")
+  Course.create(:title => "Algebra 2", :teacher_id => teacher1.id)
+  Course.create(:title => "Basic Geometry", :teacher_id => teacher1.id)
+  Course.create(:title => "Applied Physics", :teacher_id => teacher2.id)
+  Course.create(:title => "General Relativity", :teacher_id => teacher2.id)
+  Course.create(:title => "Complex Geometrical Spaces", :teacher_id => teacher2.id)
+end
+
+Now, you can run the program and data should appear at each one of the locations ("API endpoints") that you created.
+
+> ruby app.rby
+
